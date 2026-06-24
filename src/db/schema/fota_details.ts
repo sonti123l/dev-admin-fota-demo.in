@@ -1,7 +1,6 @@
 import { pgTable, serial, integer, text, timestamp } from "drizzle-orm/pg-core";
-
 export const tuDevices = pgTable("tu_devices", {
-  id: serial("id").primaryKey(),
+  id: integer("id").primaryKey(),
 });
 
 export const tuFotaDetails = pgTable("tu_fota_details", {

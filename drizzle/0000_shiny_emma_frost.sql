@@ -1,5 +1,5 @@
 CREATE TABLE "tu_devices" (
-	"id" serial PRIMARY KEY NOT NULL
+	"id" integer PRIMARY KEY NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "tu_fota_details" (
