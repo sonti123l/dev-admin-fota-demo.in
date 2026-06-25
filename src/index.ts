@@ -71,22 +71,24 @@ app.post("/add-fota-details", async (c) => {
 
   const device_id = response.device_id;
 
-  const check_device_id_with_same_version_present_or_not = await db
-    .select({ id: tuFotaDetails.id })
-    .from(tuFotaDetails)
-    .where(
-      and(
-        eq(tuFotaDetails.deviceId, device_id),
-        or(
-          eq(tuFotaDetails.deviceNewVersion, response.device_new_version),
-          eq(tuFotaDetails.webNewVersion, response.web_new_version),
-        ),
-      ),
-    );
+  // const check_device_id_with_same_version_present_or_not = await db
+  //   .select({ id: tuFotaDetails.id })
+  //   .from(tuFotaDetails)
+  //   .where(
+  //     and(
+  //       eq(tuFotaDetails.deviceId, device_id),
+  //       or(
+  //         eq(tuFotaDetails.deviceNewVersion, response.device_new_version),
+  //         eq(tuFotaDetails.webNewVersion, response.web_new_version),
+  //       ),
+  //     ),
+  //   );
 
-  if (check_device_id_with_same_version_present_or_not?.length > 0) {
-    return c.json({ message: "Already present with same version number" });
-  }
+  // console.log(check_device_id_with_same_version_present_or_not);
+
+  // if (check_device_id_with_same_version_present_or_not?.length > 0) {
+  //   return c.json({ message: "Already present with same version number" });
+  // }
 
   const insert_into_fota_details = await db
     .insert(tuFotaDetails)
