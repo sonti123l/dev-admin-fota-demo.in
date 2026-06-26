@@ -1,0 +1,125 @@
+{
+  "id": "ef27035f-edaf-44fd-9fdf-95cee3708624",
+  "prevId": "86b6bce0-9c27-4ee7-9196-19c314e77497",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.tu_devices": {
+      "name": "tu_devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tu_fota_details": {
+      "name": "tu_fota_details",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_old_version": {
+          "name": "device_old_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_new_version": {
+          "name": "device_new_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_old_version": {
+          "name": "web_old_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_new_version": {
+          "name": "web_new_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_status": {
+          "name": "web_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_fota_url": {
+          "name": "device_fota_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_fota_url": {
+          "name": "web_fota_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tu_fota_details_device_id_tu_devices_id_fk": {
+          "name": "tu_fota_details_device_id_tu_devices_id_fk",
+          "tableFrom": "tu_fota_details",
+          "tableTo": "tu_devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

@@ -1,0 +1,12 @@
+{
+    "id": 23,
+    "device_id": 11,
+    "device_old_version": "2.0.0",
+    "device_new_version": "2.1.0",
+    "web_old_version": "1.0.0",
+    "web_new_version": "1.1.0",
+    "status": "NEWIMAGE",
+    "web_status": "NEWIMAGE",
+    "device_version_url": "https://drive.google.com/file/d/1AK0nDeeyUxldMg23l_14A2PasWj2sCYv/view?usp=sharing",
+    "web_version_url": "https://drive.google.com/file/d/1rZXBO0KjEDeEj0kckfW_z-wiouC-VSWY/view?usp=sharing"
+}
