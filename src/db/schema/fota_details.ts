@@ -11,6 +11,7 @@ export const tuFotaDetails = pgTable("tu_fota_details", {
   webOldVersion: text("web_old_version"),
   webNewVersion: text("web_new_version"),
   status: text("status"),
+  web_status: text("web_status"),
   deviceFotaUrl: text("device_fota_url"),
   webFotaUrl: text("web_fota_url"),
 });
