@@ -44,7 +44,8 @@ app.patch("/:deviceId/update-fota-status", async (c) => {
   }
 
   const body = await c.req.json();
-  const status = body.status;
+  const device_status = body.device_status;
+  const web_status = body.web_status
 
   const latest = await db
     .select({ id: tuFotaDetails.id })
@@ -59,7 +60,7 @@ app.patch("/:deviceId/update-fota-status", async (c) => {
 
   const updated = await db
     .update(tuFotaDetails)
-    .set({ status })
+    .set({ device_status: device_status, web_status: web_status })
     .where(eq(tuFotaDetails.id, latest[0].id))
     .returning();
 
@@ -98,7 +99,7 @@ app.post("/add-fota-details", async (c) => {
       deviceNewVersion: response.device_new_version,
       webOldVersion: response.web_old_version,
       webNewVersion: response.web_new_version,
-      status: "NEWIMAGE",
+      device_status: "NEWIMAGE",
       web_status: "NEWIMAGE",
       deviceFotaUrl: response.device_update_url,
       webFotaUrl: response.web_update_url,

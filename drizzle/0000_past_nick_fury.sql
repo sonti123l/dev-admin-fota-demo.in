@@ -9,7 +9,8 @@ CREATE TABLE "tu_fota_details" (
 	"device_new_version" text,
 	"web_old_version" text,
 	"web_new_version" text,
-	"status" text,
+	"device_status" text,
+	"web_status" text,
 	"device_fota_url" text,
 	"web_fota_url" text
 );

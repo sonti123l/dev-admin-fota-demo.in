@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1782285141445,
-      "tag": "0000_shiny_emma_frost",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1782455088835,
-      "tag": "0001_greedy_forge",
+      "when": 1782717916387,
+      "tag": "0000_past_nick_fury",
       "breakpoints": true
     }
   ]

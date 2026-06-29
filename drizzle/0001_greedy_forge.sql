@@ -1,1 +1,0 @@
-ALTER TABLE "tu_fota_details" ADD COLUMN "web_status" text;

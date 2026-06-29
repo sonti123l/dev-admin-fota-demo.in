@@ -1,5 +1,5 @@
 {
-  "id": "86b6bce0-9c27-4ee7-9196-19c314e77497",
+  "id": "710baec6-a824-4475-8439-8c7f8b9fce3b",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -63,8 +63,14 @@
           "primaryKey": false,
           "notNull": false
         },
-        "status": {
-          "name": "status",
+        "device_status": {
+          "name": "device_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_status": {
+          "name": "web_status",
           "type": "text",
           "primaryKey": false,
           "notNull": false
