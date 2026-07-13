@@ -99,8 +99,8 @@ app.post("/add-fota-details", async (c) => {
       deviceNewVersion: response.device_new_version,
       webOldVersion: response.web_old_version,
       webNewVersion: response.web_new_version,
-      device_status: "NEWIMAGE",
-      web_status: "NEWIMAGE",
+      device_status: response.device_update_url ? "NEWIMAGE" : "",
+      web_status: response.web_update_url ? "NEWIMAGE" : "",
       deviceFotaUrl: response.device_update_url,
       webFotaUrl: response.web_update_url,
     })
