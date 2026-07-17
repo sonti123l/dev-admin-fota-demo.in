@@ -8,6 +8,13 @@
       "when": 1782717916387,
       "tag": "0000_past_nick_fury",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784286170558,
+      "tag": "0001_rapid_echo",
+      "breakpoints": true
     }
   ]
 }

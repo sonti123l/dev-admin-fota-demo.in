@@ -1,0 +1,149 @@
+{
+  "id": "d9bc4bc7-12c6-4908-9afc-7c91981cd0bf",
+  "prevId": "710baec6-a824-4475-8439-8c7f8b9fce3b",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.tu_devices": {
+      "name": "tu_devices",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "integer",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.tu_fota_details": {
+      "name": "tu_fota_details",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "device_id": {
+          "name": "device_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_old_version": {
+          "name": "device_old_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_new_version": {
+          "name": "device_new_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_old_version": {
+          "name": "web_old_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_new_version": {
+          "name": "web_new_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_status": {
+          "name": "device_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_status": {
+          "name": "web_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "device_fota_url": {
+          "name": "device_fota_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "web_fota_url": {
+          "name": "web_fota_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fota_old_version": {
+          "name": "fota_old_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fota_new_version": {
+          "name": "fota_new_version",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fota_update_url": {
+          "name": "fota_update_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fota_status": {
+          "name": "fota_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "tu_fota_details_device_id_tu_devices_id_fk": {
+          "name": "tu_fota_details_device_id_tu_devices_id_fk",
+          "tableFrom": "tu_fota_details",
+          "tableTo": "tu_devices",
+          "columnsFrom": [
+            "device_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
