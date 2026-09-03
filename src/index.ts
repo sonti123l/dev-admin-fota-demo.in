@@ -252,11 +252,18 @@ async function getLatestNonEmpty(
   column:
     | typeof tuFotaDetails.deviceOldVersion
     | typeof tuFotaDetails.webOldVersion,
+  device_id: number,
 ) {
   return db
     .select()
     .from(tuFotaDetails)
-    .where(and(ne(column, ""), isNotNull(column)))
+    .where(
+      and(
+        ne(column, ""),
+        isNotNull(column),
+        eq(tuFotaDetails.deviceId, device_id),
+      ),
+    )
     .orderBy(desc(tuFotaDetails.id))
     .limit(1);
 }
@@ -351,9 +358,9 @@ app.post("/add-fota-details", async (c) => {
   const fotaNewVersionInput = getStringField("fota_new_version");
 
   try {
-    let deviceFileName = "";
-    let webFileName = "";
-    let fotaFileName = "";
+    let deviceFileName: string | null = "";
+    let webFileName: string | null = "";
+    let fotaFileName: string | null = "";
 
     try {
       if (deviceZipFile instanceof File) {
@@ -393,14 +400,22 @@ app.post("/add-fota-details", async (c) => {
     // request still resolves each one from its own history correctly.
     let deviceFallback: string | undefined;
     if (!deviceNewVersionInput) {
-      const rows = await getLatestNonEmpty(tuFotaDetails.deviceOldVersion);
+      const rows = await getLatestNonEmpty(
+        tuFotaDetails.deviceOldVersion,
+        device_id,
+      );
       deviceFallback = rows[0]?.deviceOldVersion ?? undefined;
+      deviceFileName = rows[0]?.deviceFotaUrl ?? "";
     }
 
     let webFallback: string | undefined;
     if (!webNewVersionInput) {
-      const rows = await getLatestNonEmpty(tuFotaDetails.webOldVersion);
+      const rows = await getLatestNonEmpty(
+        tuFotaDetails.webOldVersion,
+        device_id,
+      );
       webFallback = rows[0]?.webOldVersion ?? undefined;
+      webFileName = rows[0]?.webFotaUrl ?? "";
     }
 
     const deviceOldVersion = deviceOldVersionInput || deviceFallback || "0.0.0";
@@ -607,7 +622,7 @@ app.get("/:deviceId/download-fota/:component", async (c) => {
 |
 */
 
-app.post("/:fotaId/update-fota-status", async (c) => {
+app.patch("/:fotaId/update-fota-status", async (c) => {
   const fotaId = parseInt(c.req.param("fotaId"));
 
   if (isNaN(fotaId)) {
@@ -649,7 +664,7 @@ app.post("/:fotaId/update-fota-status", async (c) => {
       .where(eq(tuFotaDetails.id, fotaId))
       .limit(1);
 
-    if (existing.length === 0) {
+    if (existing?.length === 0) {
       return c.json({ error: "No FOTA record found for this fota_id" }, 404);
     }
 
