@@ -588,6 +588,31 @@ app.get("/:deviceId/download-fota/:component", async (c) => {
 });
 
 /*
+GET /:deviceId/fota-details-list
+*/
+
+app.get("/:deviceId/fota-details-list", async (c) => {
+  const deviceId = parseInt(c.req.param("deviceId"));
+
+  if (isNaN(deviceId)) {
+    return c.json({ error: "Invalid device ID" }, 400);
+  }
+
+  const latest = await db
+    .select()
+    .from(tuFotaDetails)
+    .where(eq(tuFotaDetails.deviceId, deviceId))
+    .orderBy(desc(tuFotaDetails.id));
+
+  if (latest.length === 0) {
+  }
+
+  return c.json({     
+    fotaDetails: latest,
+  });
+});
+
+/*
 |--------------------------------------------------------------------------
 | POST /:fotaId/update-fota-status
 |--------------------------------------------------------------------------

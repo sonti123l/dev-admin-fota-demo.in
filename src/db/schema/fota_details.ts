@@ -15,11 +15,7 @@ export const tuDevices = sqliteTable("tu_devices", {
   firmwareVersion: text("firmware_version"),
   deviceVersion: text("device_version"),
 
-  // SQLite has no native TIMESTAMP type; Python's driver stores these as
-  // TEXT (ISO-ish strings) under the hood. Reading them as `text` keeps
-  // this schema honest about what actually comes back over the wire —
-  // parse into a Date in application code if/when needed, rather than
-  // asking Drizzle to silently coerce.
+
   lastHeartbeat: text("last_heartbeat"),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -48,5 +44,5 @@ export const tuFotaDetails = sqliteTable("tu_fota_details", {
 
   fotaStatus: text("fota_status").default(""),
 
-  createdAt: text("created_at"),
+  createdAt: integer("created_at", { mode: "timestamp" }),
 });
