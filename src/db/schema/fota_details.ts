@@ -1,5 +1,6 @@
 import { sqliteTable, integer, text } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import { users } from "./users.js";
 
 export const tuDevices = sqliteTable("tu_devices", {
   id: integer("id").primaryKey({ autoIncrement: true }),
@@ -15,7 +16,6 @@ export const tuDevices = sqliteTable("tu_devices", {
   firmwareVersion: text("firmware_version"),
   deviceVersion: text("device_version"),
 
-
   lastHeartbeat: text("last_heartbeat"),
   createdAt: text("created_at").default(sql`CURRENT_TIMESTAMP`),
 });
@@ -24,6 +24,7 @@ export const tuFotaDetails = sqliteTable("tu_fota_details", {
   id: integer("id").primaryKey({ autoIncrement: true }),
 
   deviceId: integer("device_id").references(() => tuDevices.id),
+  userId: integer("user_id").references(() => users.id),
 
   deviceOldVersion: text("deviceOldVersion").default(""),
   deviceNewVersion: text("deviceNewVersion").default(""),
@@ -44,5 +45,13 @@ export const tuFotaDetails = sqliteTable("tu_fota_details", {
 
   fotaStatus: text("fota_status").default(""),
 
-  createdAt: integer("created_at", { mode: "timestamp" }),
+  createdAt: integer("created_at", { mode: "timestamp" })
+    .notNull()
+    .$defaultFn(() => new Date()),
+
+  proposedBy: text("proposed_by").default(""),
+  proposedByName: text("proposed_by_name").default(""),
+  completedAt: integer("completed_at", { mode: "timestamp" }),
 });
+
+
