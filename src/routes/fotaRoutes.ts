@@ -16,3 +16,6 @@ fotaRoutes.get("/:deviceId/fota-details-list", (c) =>
 fotaRoutes.patch("/:fotaId/update-fota-status", (c) =>
   fotaController.updateFotaStatus(c),
 );
+fotaRoutes.post("/:fotaId/update-fota-status", (c) =>
+  fotaController.updateFotaStatus(c),
+);

@@ -111,6 +111,49 @@ class FotaController {
         .limit(1);
       const latestFota = latestRows[0] ?? null;
 
+      // Also query the latest historical records that have active packages for each component
+      const latestWithDeviceFileRows = await db
+        .select()
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, device_id),
+            isNotNull(tuFotaDetails.deviceFotaUrl),
+            ne(tuFotaDetails.deviceFotaUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+      const latestWithDeviceFile = latestWithDeviceFileRows[0] ?? null;
+
+      const latestWithWebFileRows = await db
+        .select()
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, device_id),
+            isNotNull(tuFotaDetails.webFotaUrl),
+            ne(tuFotaDetails.webFotaUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+      const latestWithWebFile = latestWithWebFileRows[0] ?? null;
+
+      const latestWithFotaFileRows = await db
+        .select()
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, device_id),
+            isNotNull(tuFotaDetails.fotaUpdateUrl),
+            ne(tuFotaDetails.fotaUpdateUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+      const latestWithFotaFile = latestWithFotaFileRows[0] ?? null;
+
       // 2. Fetch device record
       const deviceRows = await db
         .select()
@@ -122,6 +165,7 @@ class FotaController {
       const currentDeviceVersion = (
         deviceOldVersionInput.trim() ||
         (latestFota?.deviceStatus === 1 ? latestFota.deviceNewVersion : null) ||
+        latestWithDeviceFile?.deviceNewVersion ||
         latestFota?.deviceOldVersion ||
         currentDev?.firmwareVersion ||
         currentDev?.deviceVersion ||
@@ -131,6 +175,7 @@ class FotaController {
       const currentWebVersion = (
         webOldVersionInput.trim() ||
         (latestFota?.webStatus === 1 ? latestFota.webNewVersion : null) ||
+        latestWithWebFile?.webNewVersion ||
         latestFota?.webOldVersion ||
         (currentDev as any)?.web_version ||
         "0.0.0"
@@ -139,6 +184,7 @@ class FotaController {
       const currentFotaVersion = (
         fotaOldVersionInput.trim() ||
         (latestFota?.fotaStatus === "APPLIED" ? latestFota.fotaNewVersion : null) ||
+        latestWithFotaFile?.fotaNewVersion ||
         latestFota?.fotaOldVersion ||
         "0.0.0"
       ).trim();
@@ -275,25 +321,65 @@ class FotaController {
       // User rules:
       // 1. Whichever is going to update enters 'pending' state (status 0).
       // 2. When update is happened only for either web/device, the one that doesn't require update becomes 'success' (status 1) by default!
-      const deviceOldVersion = currentDeviceVersion;
-      const deviceNewVersion = isDeviceUpdating
-        ? deviceNewVersionInput.trim()
-        : currentDeviceVersion;
-      const deviceStatus = isDeviceUpdating ? 0 : 1;
-      const deviceFotaUrl = isDeviceUpdating ? deviceFileName || "" : "";
+      // 3. PERSISTENCE & FORWARDING: If a track is NOT being updated in this deployment,
+      //    carry forward the previous update's package URL and version so that if a device
+      //    was offline/off for weeks/months, it still receives the previous track's update
+      //    along with this new update!
 
-      const webOldVersion = currentWebVersion;
-      const webNewVersion = isWebUpdating
-        ? webNewVersionInput.trim()
-        : currentWebVersion;
-      const webStatus = isWebUpdating ? 0 : 1;
-      const webFotaUrl = isWebUpdating ? webFileName || "" : "";
+      let deviceOldVersion = currentDeviceVersion;
+      let deviceNewVersion = currentDeviceVersion;
+      let deviceStatus = 1;
+      let deviceFotaUrl = "";
 
-      const fotaOldVersion = currentFotaVersion;
-      const fotaNewVersion = isFotaUpdating
-        ? fotaNewVersionInput.trim()
-        : currentFotaVersion;
-      const fotaUpdateUrl = isFotaUpdating ? fotaFileName || "" : "";
+      if (isDeviceUpdating) {
+        deviceNewVersion = deviceNewVersionInput.trim();
+        deviceStatus = 0; // Pending
+        deviceFotaUrl = deviceFileName || "";
+      } else if (latestWithDeviceFile) {
+        // Carry forward previous device update package & version
+        deviceOldVersion =
+          latestWithDeviceFile.deviceOldVersion || currentDeviceVersion;
+        deviceNewVersion =
+          latestWithDeviceFile.deviceNewVersion || currentDeviceVersion;
+        deviceFotaUrl = latestWithDeviceFile.deviceFotaUrl || "";
+        deviceStatus = 1; // Not being updated in this deployment -> success by default
+      }
+
+      let webOldVersion = currentWebVersion;
+      let webNewVersion = currentWebVersion;
+      let webStatus = 1;
+      let webFotaUrl = "";
+
+      if (isWebUpdating) {
+        webNewVersion = webNewVersionInput.trim();
+        webStatus = 0; // Pending
+        webFotaUrl = webFileName || "";
+      } else if (latestWithWebFile) {
+        // Carry forward previous web update package & version
+        webOldVersion =
+          latestWithWebFile.webOldVersion || currentWebVersion;
+        webNewVersion =
+          latestWithWebFile.webNewVersion || currentWebVersion;
+        webFotaUrl = latestWithWebFile.webFotaUrl || "";
+        webStatus = 1; // Not being updated in this deployment -> success by default
+      }
+
+      let fotaOldVersion = currentFotaVersion;
+      let fotaNewVersion = currentFotaVersion;
+      let fotaUpdateUrl = "";
+
+      if (isFotaUpdating) {
+        fotaNewVersion = fotaNewVersionInput.trim();
+        fotaUpdateUrl = fotaFileName || "";
+      } else if (latestWithFotaFile) {
+        // Carry forward previous fota update package & version
+        fotaOldVersion =
+          latestWithFotaFile.fotaOldVersion || currentFotaVersion;
+        fotaNewVersion =
+          latestWithFotaFile.fotaNewVersion || currentFotaVersion;
+        fotaUpdateUrl = latestWithFotaFile.fotaUpdateUrl || "";
+      }
+
       const fotaStatus =
         isDeviceUpdating || isWebUpdating || isFotaUpdating
           ? "PENDING"
@@ -437,7 +523,8 @@ class FotaController {
 
   /**
    * GET /:deviceId/get-fota-details
-   * Returns the most recent tu_fota_details row for a given device.
+   * Returns the most recent tu_fota_details row for a given device,
+   * carrying forward any active package URLs that were updated in earlier records.
    */
   async getLatestFotaDetails(c: Context) {
     const deviceId = await resolveDeviceId(c.req.param("deviceId") || "");
@@ -453,8 +540,104 @@ class FotaController {
       .orderBy(desc(tuFotaDetails.id))
       .limit(1);
 
+    if (latest.length === 0) {
+      return c.json({ fotaDetails: null });
+    }
+
+    const fotaDetails = { ...latest[0] };
+
+    // If device package URL is missing in latest record, fallback to the latest record that had one
+    if (!fotaDetails.deviceFotaUrl) {
+      const prevDevice = await db
+        .select({
+          deviceFotaUrl: tuFotaDetails.deviceFotaUrl,
+          deviceNewVersion: tuFotaDetails.deviceNewVersion,
+          deviceOldVersion: tuFotaDetails.deviceOldVersion,
+        })
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, deviceId),
+            isNotNull(tuFotaDetails.deviceFotaUrl),
+            ne(tuFotaDetails.deviceFotaUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+
+      if (prevDevice.length > 0 && prevDevice[0].deviceFotaUrl) {
+        fotaDetails.deviceFotaUrl = prevDevice[0].deviceFotaUrl;
+        if (
+          !fotaDetails.deviceNewVersion ||
+          fotaDetails.deviceNewVersion === fotaDetails.deviceOldVersion
+        ) {
+          fotaDetails.deviceNewVersion = prevDevice[0].deviceNewVersion;
+        }
+      }
+    }
+
+    // If web package URL is missing in latest record, fallback to the latest record that had one
+    if (!fotaDetails.webFotaUrl) {
+      const prevWeb = await db
+        .select({
+          webFotaUrl: tuFotaDetails.webFotaUrl,
+          webNewVersion: tuFotaDetails.webNewVersion,
+          webOldVersion: tuFotaDetails.webOldVersion,
+        })
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, deviceId),
+            isNotNull(tuFotaDetails.webFotaUrl),
+            ne(tuFotaDetails.webFotaUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+
+      if (prevWeb.length > 0 && prevWeb[0].webFotaUrl) {
+        fotaDetails.webFotaUrl = prevWeb[0].webFotaUrl;
+        if (
+          !fotaDetails.webNewVersion ||
+          fotaDetails.webNewVersion === fotaDetails.webOldVersion
+        ) {
+          fotaDetails.webNewVersion = prevWeb[0].webNewVersion;
+        }
+      }
+    }
+
+    // If fota updater URL is missing in latest record, fallback to the latest record that had one
+    if (!fotaDetails.fotaUpdateUrl) {
+      const prevFota = await db
+        .select({
+          fotaUpdateUrl: tuFotaDetails.fotaUpdateUrl,
+          fotaNewVersion: tuFotaDetails.fotaNewVersion,
+          fotaOldVersion: tuFotaDetails.fotaOldVersion,
+        })
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, deviceId),
+            isNotNull(tuFotaDetails.fotaUpdateUrl),
+            ne(tuFotaDetails.fotaUpdateUrl, ""),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+
+      if (prevFota.length > 0 && prevFota[0].fotaUpdateUrl) {
+        fotaDetails.fotaUpdateUrl = prevFota[0].fotaUpdateUrl;
+        if (
+          !fotaDetails.fotaNewVersion ||
+          fotaDetails.fotaNewVersion === fotaDetails.fotaOldVersion
+        ) {
+          fotaDetails.fotaNewVersion = prevFota[0].fotaNewVersion;
+        }
+      }
+    }
+
     return c.json({
-      fotaDetails: latest[0],
+      fotaDetails,
     });
   }
 
@@ -488,10 +671,45 @@ class FotaController {
       return c.json({ error: "No FOTA details found for this device" }, 404);
     }
 
-    const storedFileName = getStoredFileNameForComponent(
+    let storedFileName = getStoredFileNameForComponent(
       latest[0],
       componentParam,
     );
+
+    // If latest record doesn't have the file for this component, find the latest record that DOES
+    if (!storedFileName) {
+      const fallbackRecord = await db
+        .select()
+        .from(tuFotaDetails)
+        .where(
+          and(
+            eq(tuFotaDetails.deviceId, deviceId),
+            componentParam === "device"
+              ? and(
+                  isNotNull(tuFotaDetails.deviceFotaUrl),
+                  ne(tuFotaDetails.deviceFotaUrl, ""),
+                )
+              : componentParam === "web"
+                ? and(
+                    isNotNull(tuFotaDetails.webFotaUrl),
+                    ne(tuFotaDetails.webFotaUrl, ""),
+                  )
+                : and(
+                    isNotNull(tuFotaDetails.fotaUpdateUrl),
+                    ne(tuFotaDetails.fotaUpdateUrl, ""),
+                  ),
+          ),
+        )
+        .orderBy(desc(tuFotaDetails.id))
+        .limit(1);
+
+      if (fallbackRecord.length > 0) {
+        storedFileName = getStoredFileNameForComponent(
+          fallbackRecord[0],
+          componentParam,
+        );
+      }
+    }
 
     if (!storedFileName) {
       return c.json(
@@ -551,17 +769,14 @@ class FotaController {
    * Status callback endpoint from device, promoting versions on success.
    */
   async updateFotaStatus(c: Context) {
-    const fotaId = parseInt(c.req.param("fotaId") || "");
+    const idParam = (c.req.param("fotaId") || c.req.param("deviceId") || "").trim();
+    let targetId = parseInt(idParam);
 
-    if (isNaN(fotaId)) {
-      return c.json({ error: "Invalid fota ID" }, 400);
+    if (isNaN(targetId)) {
+      return c.json({ error: "Invalid ID in route parameter" }, 400);
     }
 
-    let bodyJson: {
-      device_success?: boolean;
-      web_success?: boolean;
-      fota_success?: boolean;
-    };
+    let bodyJson: Record<string, any>;
 
     try {
       bodyJson = await c.req.json();
@@ -569,7 +784,38 @@ class FotaController {
       return c.json({ error: "Request body must be valid JSON" }, 400);
     }
 
-    const { device_success, web_success, fota_success } = bodyJson;
+    // Robust parsing: accept device_success, device_status (1: success, 0: pending, -1: failed)
+    const parseSuccess = (
+      valSuccess: any,
+      valStatus: any,
+    ): number | undefined => {
+      const val = valSuccess !== undefined ? valSuccess : valStatus;
+      if (val === undefined || val === null || val === "") return undefined;
+
+      if (val === 1 || val === "1" || val === true || val === "true") return 1;
+      if (val === -1 || val === "-1" || val === false || val === "false") return -1;
+      if (val === 0 || val === "0") return 0;
+
+      const str = String(val).toUpperCase().trim();
+      if (str === "SUCCESS" || str === "APPLIED") return 1;
+      if (str === "FAILED") return -1;
+      if (str === "PENDING") return 0;
+
+      return undefined;
+    };
+
+    const device_success = parseSuccess(
+      bodyJson["device_success"],
+      bodyJson["device_status"],
+    );
+    const web_success = parseSuccess(
+      bodyJson["web_success"],
+      bodyJson["web_status"],
+    );
+    const fota_success = parseSuccess(
+      bodyJson["fota_success"],
+      bodyJson["fota_status"],
+    );
 
     if (
       device_success === undefined &&
@@ -579,62 +825,75 @@ class FotaController {
       return c.json(
         {
           error:
-            "At least one of device_success, web_success, fota_success is required",
+            "At least one of device_success/device_status, web_success/web_status, fota_success/fota_status is required",
         },
         400,
       );
     }
 
     try {
-      const existing = await db
+      let existing = await db
         .select()
         .from(tuFotaDetails)
-        .where(eq(tuFotaDetails.id, fotaId))
+        .where(eq(tuFotaDetails.id, targetId))
         .limit(1);
 
       if (existing?.length === 0) {
-        return c.json({ error: "No FOTA record found for this fota_id" }, 404);
+        // Fallback: Check if targetId was passed as a deviceId
+        const byDeviceId = await db
+          .select()
+          .from(tuFotaDetails)
+          .where(eq(tuFotaDetails.deviceId, targetId))
+          .orderBy(desc(tuFotaDetails.id))
+          .limit(1);
+
+        if (byDeviceId?.length > 0) {
+          existing = byDeviceId;
+        } else {
+          return c.json({ error: `No FOTA record found for ID: ${targetId}` }, 404);
+        }
       }
 
       const record = existing[0];
+      const fotaId = record.id;
       const updates: Partial<typeof tuFotaDetails.$inferInsert> = {};
 
-      if (device_success === true) {
+      if (device_success === 1) {
         updates.deviceStatus = 1;
         if (record.deviceNewVersion) {
           updates.deviceOldVersion = record.deviceNewVersion;
         }
-      } else if (device_success === false) {
+      } else if (device_success === -1) {
         updates.deviceStatus = -1;
+      } else if (device_success === 0) {
+        updates.deviceStatus = 0;
       }
 
-      if (web_success === true) {
+      if (web_success === 1) {
         updates.webStatus = 1;
         if (record.webNewVersion) {
           updates.webOldVersion = record.webNewVersion;
         }
-      } else if (web_success === false) {
+      } else if (web_success === -1) {
         updates.webStatus = -1;
+      } else if (web_success === 0) {
+        updates.webStatus = 0;
       }
 
-      if (fota_success === true) {
+      if (fota_success === 1) {
         if (record.fotaNewVersion) {
           updates.fotaOldVersion = record.fotaNewVersion;
         }
       }
 
-      const effDeviceStatus = updates.deviceStatus ?? record.deviceStatus;
-      const effWebStatus = updates.webStatus ?? record.webStatus;
-      const effFotaSuccess = fota_success;
-
       // Which components were targeted for update in this record?
       const wasDeviceTargeted =
-        Boolean(record.deviceFotaUrl) ||
+        record.deviceStatus === 0 ||
         (Boolean(record.deviceNewVersion) &&
           record.deviceNewVersion !== record.deviceOldVersion);
 
       const wasWebTargeted =
-        Boolean(record.webFotaUrl) ||
+        record.webStatus === 0 ||
         (Boolean(record.webNewVersion) &&
           record.webNewVersion !== record.webOldVersion);
 
@@ -643,14 +902,28 @@ class FotaController {
         (Boolean(record.fotaNewVersion) &&
           record.fotaNewVersion !== record.fotaOldVersion);
 
+      // Fallback: If fota_success was explicitly reported as failure (-1), ensure targeted pending tracks are also marked failed
+      if (fota_success === -1) {
+        if (wasDeviceTargeted && updates.deviceStatus === undefined && record.deviceStatus === 0) {
+          updates.deviceStatus = -1;
+        }
+        if (wasWebTargeted && updates.webStatus === undefined && record.webStatus === 0) {
+          updates.webStatus = -1;
+        }
+      }
+
+      const effDeviceStatus = updates.deviceStatus ?? record.deviceStatus;
+      const effWebStatus = updates.webStatus ?? record.webStatus;
+      const effFotaSuccess = fota_success;
+
       const targetedStatuses: number[] = [];
       if (wasDeviceTargeted) targetedStatuses.push(effDeviceStatus ?? 0);
       if (wasWebTargeted) targetedStatuses.push(effWebStatus ?? 0);
       if (wasFotaTargeted) {
         targetedStatuses.push(
-          effFotaSuccess === true
+          effFotaSuccess === 1
             ? 1
-            : effFotaSuccess === false
+            : effFotaSuccess === -1
               ? -1
               : 0,
         );
@@ -664,6 +937,7 @@ class FotaController {
 
       const allTargetedSuccess = statusesToEvaluate.every((s) => s === 1);
       const allTargetedFailed = statusesToEvaluate.every((s) => s === -1);
+      const anyTargetedSuccess = statusesToEvaluate.some((s) => s === 1);
       const anyTargetedFailed = statusesToEvaluate.some((s) => s === -1);
       const anyTargetedPending = statusesToEvaluate.some((s) => s === 0);
 
@@ -671,13 +945,19 @@ class FotaController {
         updates.fotaStatus = "APPLIED";
       } else if (allTargetedFailed) {
         updates.fotaStatus = "FAILED";
-      } else if (anyTargetedFailed) {
+      } else if (anyTargetedSuccess && anyTargetedFailed) {
         updates.fotaStatus = "PARTIALLY_APPLIED";
+      } else if (anyTargetedFailed && (fota_success === -1 || !anyTargetedPending)) {
+        updates.fotaStatus = "FAILED";
       } else if (anyTargetedPending) {
         updates.fotaStatus = "PENDING";
+      } else {
+        updates.fotaStatus = anyTargetedFailed ? "FAILED" : "APPLIED";
       }
 
-      updates.completedAt = new Date();
+      if (updates.fotaStatus !== "PENDING") {
+        updates.completedAt = new Date();
+      }
 
       if (
         Object.keys(updates).filter((k) => k !== "completedAt" && k !== "fotaStatus").length === 0 &&
@@ -699,7 +979,7 @@ class FotaController {
       // Sync active firmware version to tuDevices on success
       if (record.deviceId) {
         const deviceUpdates: Record<string, string> = {};
-        if (device_success === true && record.deviceNewVersion) {
+        if (device_success === 1 && record.deviceNewVersion) {
           deviceUpdates.firmwareVersion = record.deviceNewVersion;
           deviceUpdates.deviceVersion = record.deviceNewVersion;
         }

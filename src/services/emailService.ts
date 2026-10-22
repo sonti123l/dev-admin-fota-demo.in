@@ -31,9 +31,9 @@ export interface FotaCompletedParams {
   proposedByName?: string | null;
   startedAt?: Date | number | string | null;
   completedAt: Date;
-  deviceSuccess?: boolean;
-  webSuccess?: boolean;
-  fotaSuccess?: boolean;
+  deviceSuccess?: number | boolean;
+  webSuccess?: number | boolean;
+  fotaSuccess?: number | boolean;
   currentDeviceVersion?: string;
   currentWebVersion?: string;
   currentFotaVersion?: string;
@@ -161,6 +161,15 @@ class EmailService {
   }> {
     try {
       const recipients = await this.getRecipients();
+
+      // Add proposer email to recipients list if valid
+      if (params.proposedBy && params.proposedBy.includes("@")) {
+        const pEmail = params.proposedBy.trim().toLowerCase();
+        if (!recipients.includes(pEmail)) {
+          recipients.push(pEmail);
+        }
+      }
+
       if (recipients.length === 0) {
         console.warn(
           "[WARN] [EmailService] No recipients found for FOTA initiated email. Configure FOTA_NOTIFICATION_RECIPIENTS in .env or add to tu_fota_recipients table.",
@@ -377,21 +386,125 @@ The target device will download the packages and execute the update. A completio
 
       const duration = this.getDurationString(params.startedAt, params.completedAt);
 
+      // Add proposer email to recipients list if valid
+      if (params.proposedBy && params.proposedBy.includes("@")) {
+        const pEmail = params.proposedBy.trim().toLowerCase();
+        if (!recipients.includes(pEmail)) {
+          recipients.push(pEmail);
+        }
+      }
+
+      const isDeviceFailed = params.deviceSuccess === false || params.deviceSuccess === -1;
+      const isDeviceSuccess = params.deviceSuccess === true || params.deviceSuccess === 1;
+      const isDevicePending = params.deviceSuccess === 0;
+
+      const isWebFailed = params.webSuccess === false || params.webSuccess === -1;
+      const isWebSuccess = params.webSuccess === true || params.webSuccess === 1;
+      const isWebPending = params.webSuccess === 0;
+
+      const isFotaFailed = params.fotaSuccess === false || params.fotaSuccess === -1;
+      const isFotaSuccess = params.fotaSuccess === true || params.fotaSuccess === 1;
+
+      const isFailed =
+        params.status === "FAILED" ||
+        (isDeviceFailed && !isWebSuccess) ||
+        (isWebFailed && !isDeviceSuccess) ||
+        (!isDeviceSuccess && !isWebSuccess && isFotaFailed);
+
+      const isPartial =
+        params.status === "PARTIALLY_APPLIED" ||
+        (isDeviceSuccess && isWebFailed) ||
+        (isDeviceFailed && isWebSuccess);
+
+      const isPending =
+        params.status === "PENDING" ||
+        isDevicePending ||
+        isWebPending;
+
       const isFullSuccess =
-        params.deviceSuccess !== false &&
-        params.webSuccess !== false &&
-        params.fotaSuccess !== false;
+        params.status === "APPLIED" ||
+        (!isFailed &&
+          !isPartial &&
+          !isPending &&
+          !isDeviceFailed &&
+          !isWebFailed &&
+          !isFotaFailed);
 
       const subject = isFullSuccess
-        ? `✅ [FOTA COMPLETED] Update Successfully Installed on Device: ${deviceIdentifier} [ID: #${params.deviceId}]`
-        : `⚠️ [FOTA STATUS UPDATE] Device: ${deviceIdentifier} [ID: #${params.deviceId}] - Status: ${params.status}`;
+        ? `✅ [FOTA SUCCESS] Update Successfully Installed on Device: ${deviceIdentifier} [ID: #${params.deviceId}]`
+        : isFailed
+          ? `❌ [FOTA FAILED] Update Failed on Device: ${deviceIdentifier} [ID: #${params.deviceId}]`
+          : isPartial
+            ? `⚠️ [FOTA PARTIAL] Update Partially Applied on Device: ${deviceIdentifier} [ID: #${params.deviceId}]`
+            : `⏳ [FOTA PENDING] Update Pending on Device: ${deviceIdentifier} [ID: #${params.deviceId}]`;
 
-      const getComponentBadge = (success?: boolean) => {
-        if (success === true) {
+      let headerGradient =
+        "linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%)";
+      let headerBadgeBg = "#10b981";
+      let headerBadgeText = "FOTA Update Succeeded";
+      let headerTitle = "Update Successfully Applied";
+      let headerSub =
+        "The target device has executed the FOTA update and confirmed successful installation.";
+      let alertBoxHtml = `
+        <div style="background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 14px 16px; border-radius: 0 6px 6px 0; margin-top: 24px; font-size: 13px; color: #166534; line-height: 1.5;">
+          <strong>Update Succeeded:</strong><br>
+          The device has verified and applied the software components. Active version numbers have been promoted in the system registry. The device is now operational on the updated firmware.
+        </div>
+      `;
+
+      if (isFailed) {
+        headerGradient =
+          "linear-gradient(135deg, #881337 0%, #9f1239 50%, #be123c 100%)";
+        headerBadgeBg = "#ef4444";
+        headerBadgeText = "FOTA Update Failed";
+        headerTitle = "Update Failed to Apply";
+        headerSub =
+          "The target device encountered an error during installation and reported failure.";
+        alertBoxHtml = `
+          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 14px 16px; border-radius: 0 6px 6px 0; margin-top: 24px; font-size: 13px; color: #991b1b; line-height: 1.5;">
+            <strong>Update Failed:</strong><br>
+            The update could not be applied by the device. Version numbers were <strong>NOT</strong> promoted. The device continues running its previous stable release.
+          </div>
+        `;
+      } else if (isPartial) {
+        headerGradient =
+          "linear-gradient(135deg, #78350f 0%, #92400e 50%, #b45309 100%)";
+        headerBadgeBg = "#f59e0b";
+        headerBadgeText = "FOTA Partially Applied";
+        headerTitle = "Update Partially Applied";
+        headerSub =
+          "One or more components failed to apply while others succeeded.";
+        alertBoxHtml = `
+          <div style="background-color: #fffbeb; border-left: 4px solid #f59e0b; padding: 14px 16px; border-radius: 0 6px 6px 0; margin-top: 24px; font-size: 13px; color: #92400e; line-height: 1.5;">
+            <strong>Partial Update:</strong><br>
+            Some software components were applied successfully, but others failed. Successful components have been promoted; failed components remain on their previous version.
+          </div>
+        `;
+      } else if (isPending) {
+        headerGradient =
+          "linear-gradient(135deg, #7c2d12 0%, #9a3412 50%, #c2410c 100%)";
+        headerBadgeBg = "#f97316";
+        headerBadgeText = "FOTA Update In Progress";
+        headerTitle = "Update Pending / In Progress";
+        headerSub =
+          "The target device is currently downloading, verifying, or applying the update.";
+        alertBoxHtml = `
+          <div style="background-color: #fff7ed; border-left: 4px solid #f97316; padding: 14px 16px; border-radius: 0 6px 6px 0; margin-top: 24px; font-size: 13px; color: #9a3412; line-height: 1.5;">
+            <strong>Update Pending:</strong><br>
+            The software components are in progress and have not yet fully applied. Active versions have not been promoted.
+          </div>
+        `;
+      }
+
+      const getComponentBadge = (success?: number | boolean) => {
+        if (success === true || success === 1) {
           return '<span style="color:#16a34a;font-weight:600;">✓ Applied Successfully</span>';
         }
-        if (success === false) {
+        if (success === false || success === -1) {
           return '<span style="color:#dc2626;font-weight:600;">✗ Failed</span>';
+        }
+        if (success === 0) {
+          return '<span style="color:#d97706;font-weight:600;">⏳ Pending</span>';
         }
         return '<span style="color:#64748b;">Not Updated / Unchanged</span>';
       };
@@ -406,10 +519,10 @@ The target device will download the packages and execute the update. A completio
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f1f5f9; margin: 0; padding: 24px; color: #1e293b; }
     .container { max-width: 650px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0; }
-    .header { background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%); color: #ffffff; padding: 28px 32px; }
+    .header { background: ${headerGradient}; color: #ffffff; padding: 28px 32px; }
     .header h1 { margin: 0 0 8px 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-    .header p { margin: 0; font-size: 13px; color: #a7f3d0; }
-    .badge { display: inline-block; background-color: #10b981; color: #ffffff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
+    .header p { margin: 0; font-size: 13px; color: #e2e8f0; }
+    .badge { display: inline-block; background-color: ${headerBadgeBg}; color: #ffffff; font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px; }
     .body-content { padding: 32px; }
     .section-title { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; margin: 24px 0 12px 0; border-bottom: 1px solid #f1f5f9; padding-bottom: 6px; }
     .info-table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
@@ -420,16 +533,15 @@ The target device will download the packages and execute the update. A completio
     .version-table th { background: #f8fafc; text-align: left; padding: 10px 12px; font-size: 12px; font-weight: 600; color: #475569; border-bottom: 1px solid #e2e8f0; }
     .version-table td { padding: 10px 12px; font-size: 13px; border-bottom: 1px solid #f1f5f9; }
     .version-tag { font-family: monospace; font-size: 12px; padding: 2px 6px; background: #dcfce7; color: #166534; border-radius: 4px; font-weight: 600; }
-    .success-box { background-color: #f0fdf4; border-left: 4px solid #10b981; padding: 14px 16px; border-radius: 0 6px 6px 0; margin-top: 24px; font-size: 13px; color: #166534; line-height: 1.5; }
     .footer { background: #f8fafc; padding: 20px 32px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="header">
-      <span class="badge">FOTA Update Finished</span>
-      <h1>Update Successfully Applied</h1>
-      <p>The target device has executed the FOTA update and reported completion.</p>
+      <span class="badge">${headerBadgeText}</span>
+      <h1>${headerTitle}</h1>
+      <p>${headerSub}</p>
     </div>
     
     <div class="body-content">
@@ -497,10 +609,7 @@ The target device will download the packages and execute the update. A completio
         </tbody>
       </table>
 
-      <div class="success-box">
-        <strong>Update Result:</strong><br>
-        The device has verified and applied the software components. Active version numbers have been promoted in the system registry. The device is now operational on the updated firmware.
-      </div>
+      ${alertBoxHtml}
     </div>
 
     <div class="footer">
@@ -513,12 +622,12 @@ The target device will download the packages and execute the update. A completio
       `;
 
       const text = `
-[FOTA COMPLETED] Update Successfully Applied on Device: ${deviceIdentifier} (ID: #${params.deviceId})
+${isFullSuccess ? "[FOTA SUCCESS]" : isFailed ? "[FOTA FAILED]" : "[FOTA PARTIAL]"} Update Report for Device: ${deviceIdentifier} (ID: #${params.deviceId})
 ========================================================================
 
-The target device has executed the FOTA update and reported completion.
+${headerSub}
 
-COMPLETION DETAILS:
+STATUS & EXECUTION DETAILS:
 - Target Device: ${params.deviceName || "Unnamed Device"}
 - Hardware UUID: ${params.hardwareUuid || "N/A"}
 - Device ID: #${params.deviceId}
@@ -529,9 +638,9 @@ COMPLETION DETAILS:
 - Final Status: ${params.status}
 
 ACTIVE VERSIONS ON DEVICE:
-- Device App: ${params.currentDeviceVersion || "0.0.0"} (Status: ${params.deviceSuccess ? "Applied" : "Unchanged"})
-- Web UI: ${params.currentWebVersion || "0.0.0"} (Status: ${params.webSuccess ? "Applied" : "Unchanged"})
-- System FOTA: ${params.currentFotaVersion || "0.0.0"} (Status: ${params.fotaSuccess ? "Applied" : "Unchanged"})
+- Device App: ${params.currentDeviceVersion || "0.0.0"} (Result: ${isDeviceSuccess ? "Applied" : isDeviceFailed ? "Failed" : isDevicePending ? "Pending" : "Unchanged"})
+- Web UI: ${params.currentWebVersion || "0.0.0"} (Result: ${isWebSuccess ? "Applied" : isWebFailed ? "Failed" : isWebPending ? "Pending" : "Unchanged"})
+- System FOTA: ${params.currentFotaVersion || "0.0.0"} (Result: ${isFotaSuccess ? "Applied" : isFotaFailed ? "Failed" : params.fotaSuccess === 0 ? "Pending" : "Unchanged"})
       `;
 
       const result = await this.getTransporter().sendMail({

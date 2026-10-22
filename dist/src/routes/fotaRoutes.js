@@ -6,3 +6,4 @@ fotaRoutes.get("/:deviceId/get-fota-details", (c) => fotaController.getLatestFot
 fotaRoutes.get("/:deviceId/download-fota/:component", (c) => fotaController.downloadFotaArchive(c));
 fotaRoutes.get("/:deviceId/fota-details-list", (c) => fotaController.getFotaDetailsList(c));
 fotaRoutes.patch("/:fotaId/update-fota-status", (c) => fotaController.updateFotaStatus(c));
+fotaRoutes.post("/:fotaId/update-fota-status", (c) => fotaController.updateFotaStatus(c));
